@@ -2,79 +2,55 @@
 #include <conio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <math.h> 
+#include <math.h>
 
-class Ball {
-private:
-    int x, y;      
-    int dx, dy;     
-    int radius;     
-    int color;     
+bool useQuadtree = false;
+int page = 0;
 
+class bola {
 public:
+    int x, y;
+    int dx, dy;
+    int r;
+    int warna;
 
-    Ball() {
-        radius = 10;
-        // Posisi awal acak, memastikan bola tidak keluar batas
-        x = rand() % (getmaxx() - 2 * radius) + radius;
-        y = rand() % (getmaxy() - 2 * radius) + radius;
+    bola() {
+        r = 10;
 
-        int speedX = rand() % 5 + 2;
-        int speedY = rand() % 5 + 2;
+        x = rand() % (getmaxx() - 2 * r) + r;
+        y = rand() % (getmaxy() - 2 * r) + r;
 
-        // Tentukan arah acak
-        dx = (rand() % 2 == 0) ? speedX : -speedX;
-        dy = (rand() % 2 == 0) ? speedY : -speedY;
+        int speedx = rand() % 5 + 2;
+        int speedy = rand() % 5 + 2;
 
-        color = rand() % 15 + 1;
+        dx = (rand() % 2) ? speedx : -speedx;
+        dy = (rand() % 2) ? speedy : -speedy;
+
+        warna = rand() % 15 + 1;
     }
 
-   
     void draw() {
-        setcolor(color);
-        setfillstyle(SOLID_FILL, color);
-        // Menggunakan fillellipse (fillellipse(x, y, xradius, yradius))
-        fillellipse(x, y, radius, radius); 
+        setcolor(warna);
+        setfillstyle(SOLID_FILL, warna);
+        fillellipse(x, y, r, r);
     }
 
-    // Metode untuk memperbarui posisi dan menangani tabrakan dinding
     void update() {
         x += dx;
         y += dy;
 
-        // Tabrakan dengan sumbu X (kiri dan kanan)
-        if (x - radius <= 0 || x + radius >= getmaxx()) {
-            dx *= -1; 
-            // ngecek bola tidak terjebak di dinding
-            if (x - radius < 0) x = radius;
-            if (x + radius > getmaxx()) x = getmaxx() - radius;
-        }
-
-        // Tabrakan dengan sumbu Y (atas dan bawah)
-        if (y - radius <= 0 || y + radius >= getmaxy()) {
-            dy *= -1; 
-            // ngecek bola tidak terjebak di dinding
-            if (y - radius < 0) y = radius;
-            if (y + radius > getmaxy()) y = getmaxy() - radius;
-        }
+        if (x - r <= 0 || x + r >= getmaxx()) dx = -dx;
+        if (y - r <= 0 || y + r >= getmaxy()) dy = -dy;
     }
 
-    // ALGORITMA BRUTE FORCE (Respons Tabrakan Antar Bola) 
-    void resolveCollision(Ball& other) {
-        // Hitung perbedaan posisi
-        int dx_dist = x - other.x;
-        int dy_dist = y - other.y;
-        
-        //Hitung jarak kuadrat antar pusat bola
-        long long dist_sq = (long long)dx_dist * dx_dist + (long long)dy_dist * dy_dist;
-        
-        // Jarak minimum agar tidak bertabrakan
-        int min_dist = radius + other.radius;
+    void cektabrakan(bola& other) {
+        int dx_jarakx = x - other.x;
+        int dy_jaraky = y - other.y;
 
-        // Cek tabrakan
-        if (dist_sq <= (long long)min_dist * min_dist) {
-            
-            // 1. Tanggapan (Respons) Tabrakan Sederhana: Tukar Kecepatan
+        int jarak = dx_jarakx * dx_jarakx + dy_jaraky * dy_jaraky;
+        int min_jarak = (r + other.r);
+
+        if (jarak <= min_jarak * min_jarak) {
             int temp_dx = dx;
             int temp_dy = dy;
 
@@ -83,69 +59,160 @@ public:
 
             other.dx = temp_dx;
             other.dy = temp_dy;
-
-            // 2. Pemisahan Posisi (Mencegah Bola Terjebak)
-            // Hitung seberapa jauh bola berjarak (overlap)
-            float dist = sqrt((float)dist_sq);
-            float overlap = (float)min_dist - dist; 
-
-            // Vektor normalisasi arah pemisahan
-            float nx = (float)dx_dist / dist;
-            float ny = (float)dy_dist / dist;
-            
-            // Pindahkan kedua bola menjauh satu sama lain (setengah dari overlap)
-            x += (int)(nx * overlap * 0.5f);
-            y += (int)(ny * overlap * 0.5f);
-            other.x -= (int)(nx * overlap * 0.5f);
-            other.y -= (int)(ny * overlap * 0.5f);
         }
     }
-    
-    // Diperlukan untuk menghindari error saat membandingkan jarak dengan sqrt
-    friend float getDistance(const Ball& b1, const Ball& b2);
 };
 
 
-int main() {
-    int gd = DETECT, gm;
-    
-    initgraph(&gd, &gm, ""); 
+// QUADTREE
+class Quadtree {
+public:
+    int x, y, w, h;
+    int kapasitas;
 
-    srand(time(NULL));
+    bola* object[10];
+    int jumlah;
+    bool terbagi;
 
-    const int BALL_COUNT = 30;
-    Ball balls[BALL_COUNT];
+    Quadtree *aki, *ak, *bki, *bk;
 
-    // Double Buffering: Menggunakan dua halaman memori (page 0 dan page 1)
-    
-    int page = 0;
+    Quadtree(int _x, int _y, int _w, int _h, int kapasit = 4) {
+        x = _x;
+        y = _y;
+        w = _w;
+        h = _h;
+        kapasitas = kapasit;
+        jumlah = 0;
+        terbagi = false;
 
-    // Loop utama
-    while (!kbhit()) {
-        // Mengatur halaman aktif dan halaman visual
-        setactivepage(page);
-        setvisualpage(1 - page);
-        cleardevice(); // Bersihkan halaman aktif
-
-        // ALGORITMA BRUTE FORCE (Deteksi Tabrakan Antar Bola) 
-        // Cek setiap pasangan bola (i, j)
-        for (int i = 0; i < BALL_COUNT; i++) {
-            for (int j = i + 1; j < BALL_COUNT; j++) {
-                
-                balls[i].resolveCollision(balls[j]); 
-            }
-        }
-        
-        // Update dan gambar semua bola
-        for (int i = 0; i < BALL_COUNT; i++) {
-            balls[i].draw();
-            balls[i].update(); // update menangani tabrakan dinding
-        }
-
-        delay(20); 
-        page = 1 - page; 
+        aki = ak = bki = bk = NULL;
     }
 
-    closegraph();
+    bool contains(bola* b) {
+        return (b->x >= x && b->x <= x + w &&
+                b->y >= y && b->y <= y + h);
+    }
+
+    void subdivide() {
+        aki = new Quadtree(x,        y,        w/2, h/2, kapasitas);
+        ak  = new Quadtree(x+w/2,    y,        w/2, h/2, kapasitas);
+        bki = new Quadtree(x,        y+h/2,    w/2, h/2, kapasitas);
+        bk  = new Quadtree(x+w/2,    y+h/2,    w/2, h/2, kapasitas);
+        terbagi = true;
+    }
+
+    void insert(bola* b) {
+        if (!contains(b)) return;
+
+        if (jumlah < kapasitas) {
+            object[jumlah] = b;
+            jumlah++;
+        } else {
+            if (!terbagi) subdivide();
+
+            aki->insert(b);
+            ak->insert(b);
+            bki->insert(b);
+            bk->insert(b);
+        }
+    }
+};
+
+
+// QUERY QUADTREE
+void query(Quadtree* qt, bola* target, bola* hasil[], int &jumlah) {
+    if (!qt->contains(target)) return;
+
+    for (int i = 0; i < qt->jumlah; i++) {
+        hasil[jumlah] = qt->object[i];
+        jumlah++;               
+    }
+
+    if (qt->terbagi) {
+        query(qt->aki, target, hasil, jumlah);
+        query(qt->ak,  target, hasil, jumlah);
+        query(qt->bki, target, hasil, jumlah);
+        query(qt->bk,  target, hasil, jumlah);
+    }
+}
+
+
+//   BRUTE FORCE COLLISION
+void bruteForceCollision(bola balls[], int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = i + 1; j < n; j++) {
+            balls[i].cektabrakan(balls[j]);
+        }
+    }
+}
+
+
+//   QUADTREE COLLISION
+
+void quadtreecolission(bola balls[], int n) {
+    Quadtree akar(0, 0, getmaxx(), getmaxy());
+
+    for (int i = 0; i < n; i++) {
+        akar.insert(&balls[i]);
+    }
+
+    for (int i = 0; i < n; i++) {
+        bola* target[50];
+        int jumlah = 0;
+
+        query(&akar, &balls[i], target, jumlah);
+
+        for (int k = 0; k < jumlah; k++) {
+            if (target[k] != &balls[i]) {
+                balls[i].cektabrakan(*target[k]);
+            }
+        }
+    }
+}
+
+
+int main() {
+    initwindow(800, 600);
+    srand(time(NULL));
+
+    const int JUMLAH_BOLA = 100;
+    bola balls[JUMLAH_BOLA];
+
+    while (true) {
+        setactivepage(page);
+        setvisualpage(1 - page);
+        cleardevice();
+
+        // INPUT MODE
+        if (kbhit()) {
+            char c = getch();
+            if (c == 'b') useQuadtree = false;
+            else if (c == 'q') useQuadtree = true;
+        }
+
+        // TAMPILKAN MODE SETIAP FRAME
+        setcolor(WHITE);
+        if (useQuadtree)
+            outtextxy(10, 10, (char*)"MODE: QUADTREE");
+        else
+            outtextxy(10, 10, (char*)"MODE: BRUTE FORCE");
+
+        // UPDATE BOLA
+        for (int i = 0; i < JUMLAH_BOLA; i++) { 
+            balls[i].update();}
+
+        // COLLISION
+        if (!useQuadtree)
+            bruteForceCollision(balls, JUMLAH_BOLA);
+        else
+            quadtreecolission(balls, JUMLAH_BOLA);
+
+        // DRAW BOLA
+        for (int i = 0; i < JUMLAH_BOLA; i++) balls[i].draw();
+
+        page = 1 - page;
+        delay(10);
+    }
+
     return 0;
 }
