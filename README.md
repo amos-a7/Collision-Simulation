@@ -115,3 +115,51 @@ void quadtreecolission(bola balls[], int n) {
         }
     }
 }
+
+## ⚙️ Cara Kerja Program
+
+Program ini berjalan menggunakan *infinite loop* di dalam fungsi `main()`. Berikut adalah urutan logika yang terjadi pada setiap *frame* (bingkai) animasi:
+
+1.  **Inisialisasi (`Init`)**:
+    * Program membuka jendela grafis ukuran 800x600.
+    * Program membangkitkan 5.000 objek bola dengan posisi, warna, dan arah gerak acak.
+
+2.  **Double Buffering & Cleaning**:
+    * Program mengatur `setactivepage` (halaman tempat menggambar di memori) dan `setvisualpage` (halaman yang tampil di layar) secara bergantian.
+    * Layar dibersihkan (`cleardevice`) agar gambar frame sebelumnya tidak menumpuk.
+
+3.  **Input User**:
+    * Program mengecek apakah ada tombol keyboard yang ditekan menggunakan `kbhit()`.
+    * Jika **'q'** ditekan: Variabel `useQuadtree` diubah menjadi `true`.
+    * Jika **'b'** ditekan: Variabel `useQuadtree` diubah menjadi `false`.
+
+4.  **Update Fisika**:
+    * Posisi setiap bola diperbarui (`x += dx`, `y += dy`).
+    * Jika bola menabrak dinding layar, arah kecepatannya dibalik (memantul).
+
+5.  **Deteksi Tabrakan (Inti Algoritma)**:
+    * **Jika Mode Brute Force:** Program membandingkan jarak setiap bola dengan semua bola lainnya (Looping $N^2$).
+    * **Jika Mode Quadtree:**
+        1.  Program membuat *Quadtree* baru dari nol (Reset tree).
+        2.  Semua bola dimasukkan (`insert`) ke dalam tree. Node akan membelah diri jika kapasitas > 4.
+        3.  Program melakukan `query` untuk setiap bola guna menemukan tetangga terdekatnya.
+        4.  Pengecekan tabrakan hanya dilakukan terhadap tetangga yang ditemukan oleh query tersebut.
+
+6.  **Rendering**:
+    * Bola digambar ulang di posisi barunya menggunakan `fillellipse`.
+    * Teks mode (Quadtree/Brute Force) ditampilkan di pojok kiri atas.
+
+7.  **Looping**:
+    * Variabel `page` ditukar (0 jadi 1, atau 1 jadi 0) untuk efek animasi yang mulus.
+    * Program memberikan jeda (`delay(10)`) dan kembali ke langkah 2.
+
+---
+
+## 🎮 Kontrol
+
+Gunakan tombol keyboard berikut saat jendela simulasi aktif untuk mengganti algoritma secara *real-time*:
+
+| Tombol | Fungsi | Deskripsi |
+| :---: | :--- | :--- |
+| **Q** | **Mode Quadtree** | Mengaktifkan algoritma optimasi. Simulasi akan berjalan lancar dan cepat (High FPS). |
+| **B** | **Mode Brute Force** | Mengaktifkan algoritma naif ($O(N^2)$). Simulasi akan terasa berat dan lambat (*Lag*) karena beban komputasi tinggi. |
